@@ -5,10 +5,11 @@ const LeaveType = require("../models/leaveType")
 
 const createLeave = async (req, res) => {
 
-  const {  employeeId, leaveTypeId, leave, leavesDate, leaveeDate, comments } = req.body;
-
+  const {_id} = req.employee
+  const {  leaveTypeId, leave, leavesDate, leaveeDate, comments } = req.body;
+  const employeeId = _id
+  
   try {
-    
     const employee = await Employee.findById({"_id":employeeId});
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
@@ -49,8 +50,10 @@ const getLeaveByEmployeeId = async (req, res) => {
 
 
 const getLeaveDetails = async (req, res) => {
+ 
+ 
   try {
-
+    const EmpId = req.employee._id
     const leaveTypes = await LeaveType.aggregate([
       {
         $group: {
@@ -64,6 +67,7 @@ const getLeaveDetails = async (req, res) => {
 
     // Here Using aggregate methods to get the summary details based on employee
     const leaveDetails = await Leave.aggregate([
+      { "$match": { "employeeId":EmpId } },
       {
         $lookup: {
           from: "employees", 
@@ -142,7 +146,6 @@ const getLeaveDetails = async (req, res) => {
         },
       },
     ]);
-
     res.status(200).json(leaveDetails);
   } catch (error) {
     res.status(500).json({ success: false, message: "Error fetching leave details" });
@@ -153,49 +156,39 @@ const getLeaveDetails = async (req, res) => {
 
 const getLeaveSummary = async (req, res) => {
   try {
-    // here we used aggregate query to get summary of all the leaveTypes
+    const EmpId = req.employee._id
       const leaveSummary = await Leave.aggregate([
-          {
-              $lookup: {
-                  from: "leavetypes",
-                  localField: "leaveTypeId",
-                  foreignField: "_id",
-                  as: "leaveType",
-              },
-          },
-          { $unwind: "$leaveType" },
-          {
-              $group: {
-                  _id: "$leaveType.leaveName",
-                  totalLeave: { $sum: "$leave" },
-              },
-          },
-          {
-              $project: {
-                  _id: 0,
-                  leaveName: "$_id",
-                  totalLeave: 1,
-              },
-          },
-      ]);
-
-      const results = {
-          totalsickLeave: 0,
-          totalCasualLeave: 0,
-          totalEarnedLeave: 0,
-      };
-
-      leaveSummary.forEach((item) => {
-          if (item.leaveName === "Sick Leave") {
-              results.totalsickLeave = item.totalLeave;
-          } else if (item.leaveName === "Casual Leave") {
-              results.totalCasualLeave = item.totalLeave;
-          } else if (item.leaveName === "Earned Leave") {
-              results.totalEarnedLeave = item.totalLeave;
-          }
-      });
-
-      res.status(200).json(results);
+        { 
+            "$match": { 
+                "employeeId": EmpId
+            }
+        },
+        {
+            $lookup: {
+                from: "leavetypes",          
+                localField: "leaveTypeId",   
+                foreignField: "_id",         
+                as: "leaveType",             
+            }
+        },
+        { 
+            $unwind: "$leaveType" 
+        },
+        {
+            $group: {
+                _id: "$leaveType.leaveName", 
+                totalLeave: { $sum: "$leave" }
+            }
+        },
+        {
+            $project: {
+                _id: 0,             
+                name: "$_id",   
+                value: "$totalLeave" 
+            }
+        }
+    ]);
+      res.status(200).json(leaveSummary);
   } catch (error) {
       res.status(500).json({ success: false, message: "Error fetching leave summary" });
   }

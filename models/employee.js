@@ -8,17 +8,22 @@ const employeeSchema = new mongoose.Schema({
   employeeId: {
     type: String,
     required: true,
-    unique: true,
+    default:new Date().getMilliseconds().toString()
   },
-  jDate: {
+  joinDate: {
     type: Date,
     required: true,
     default:new Date()
   },
-  totalLeave: {
-    type: Number,
+  username: {
+    type: String,
     required: true,
   },
+  password: {
+    type: String,
+    required: true,
+  },
+
 });
 
 module.exports = mongoose.model('Employee', employeeSchema);

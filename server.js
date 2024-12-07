@@ -2,11 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
-const requestIp = require('request-ip');
-const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
+const authHandler = require("./middleware/authHandler")
+
+const authRoute = require("./routes/authRouter")
 const mainRoute = require("./routes/mainRoute")
 
 
@@ -23,20 +24,20 @@ app.use(cors());
 // Parse JSON and URL-encoded data using body-parser
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(requestIp.mw());
 
-app.use(rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  keyGenerator: (req, res) => {
-    return req.clientIp
-  }
-}))
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+//   message: "Too many requests from this IP, please try again after 15 minutes",
+//   headers: true,
+// });
 
+app.use("/api",authRoute)
 
-app.use("/api/employee",mainRoute.employeeRoute);
-app.use("/api/leave",mainRoute.leaveRoute);
-app.use("/api/type",mainRoute.leaveTypeRoute);
+// Checking session every request
+app.use("/api",authHandler,mainRoute);
+
+// set the error handler if any of the flow throw error it will check and return the relavant response
 app.use(errorHandler);
 
 app.listen(PORT, () => {

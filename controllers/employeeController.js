@@ -1,21 +1,66 @@
+const bcrypt = require("bcrypt")
+const jwt = require('jsonwebtoken');
 const Employee = require('../models/employee');
 
 
-const createEmployee = async (req, res) => {
+const employeeLogin = async (req, res) => {
+
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ message: 'username and password are required' });
+  }
   try {
-    const { employeeName, employeeId, jDate, totalLeave } = req.body;
+    // Check if user exists
+    const employee = await Employee.findOne({ username });
+    if (!employee) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(password, employee.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ employeeId: employee._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    res.status(200).json({ token });
+  } catch (error) {
+    console.error('Login Error:', error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+const createEmployee = async (req, res) => {
+  const { employeeName, username, password, joinDate } = req.body;
+
+  if (!employeeName || !username || !password || !joinDate) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  try {
+    const existingUser = await Employee.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username is already taken' });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const employee = new Employee({
       employeeName,
-      employeeId,
-      jDate,
-      totalLeave,
+      username,
+      password: hashedPassword,
+      joinDate,
     });
 
-    const savedEmployee = await employee.save();
-    res.status(200).json(savedEmployee);
+    await employee.save();
+
+    res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Signup Error:', error.message);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
@@ -77,6 +122,7 @@ const deleteEmployee = async (req, res) => {
 };
 
 const employeeController = {
+  employeeLogin,
   createEmployee,
   getEmployees,
   getEmployeeById,
